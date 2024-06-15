@@ -1,6 +1,5 @@
 import { App } from "uWebSockets.js";
-import { helmet } from "../src/index";
-// import { helmet } from "uwebsocketsjs-helmet";
+import { helmet } from "uwebsocketsjs-helmet";
 
 const app = App();
 

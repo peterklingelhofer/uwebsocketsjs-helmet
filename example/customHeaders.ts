@@ -1,6 +1,5 @@
 import { App } from "uWebSockets.js";
-import { helmet, HelmetHeaderOptions } from "../src/index";
-// import { helmet, HelmetHeaderOptions } from "uwebsocketsjs-helmet";
+import { helmet, HelmetHeaderOptions } from "uwebsocketsjs-helmet";
 
 const customHeaders: HelmetHeaderOptions = {
   "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'",

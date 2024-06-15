@@ -1,0 +1,25 @@
+{
+  "name": "uwebsocketsjs-helmet-example",
+  "version": "1.0.0",
+  "description": "Example usage of uWebSockets.js-helmet",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "start:custom": "node dist/customHeaders.js",
+    "test": "jest"
+  },
+  "author": "Peter Klingelhofer",
+  "license": "MIT",
+  "dependencies": {
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.43.0",
+    "uwebsocketsjs-helmet": "../dist"
+  },
+  "devDependencies": {
+    "@types/jest": "^27.0.0",
+    "@types/node": "^14.0.0",
+    "jest": "^27.0.0",
+    "ts-jest": "^27.0.0",
+    "typescript": "^4.0.0"
+  }
+}
