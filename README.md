@@ -6,25 +6,25 @@ A security middleware for [uWebSockets.js](https://github.com/uNetworking/uWebSo
 
 Install the package using npm:
 ```sh
-npm i uwebsocketsjs-helmet uWebSockets.js@uNetworking/uWebSockets.js#v20.43.0
+npm i uwebsocketsjs-helmet
 ```
 
 Install the package using pnpm:
 
 ```sh
-pnpm add uwebsocketsjs-helmet uWebSockets.js@uNetworking/uWebSockets.js#v20.43.0
+pnpm add uwebsocketsjs-helmet
 ```
 
 Install the package using yarn:
 
 ```sh
-yarn add uwebsocketsjs-helmet uWebSockets.js@uNetworking/uWebSockets.js#v20.43.0
+yarn add uwebsocketsjs-helmet
 ```
 
 Install the package using bun:
 
 ```sh
-bun add uwebsocketsjs-helmet uWebSockets.js@uNetworking/uWebSockets.js#v20.43.0
+bun add uwebsocketsjs-helmet
 ```
 
 ## Basic Usage
