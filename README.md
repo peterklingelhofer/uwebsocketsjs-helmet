@@ -81,7 +81,8 @@ app.listen(9001, (token) => {
 ```
 
 ## Note on installing uWebSockets.js
-Installing uWebSockets.js for the first time can be a little unintuitive. Grab your desired release tag from [uWebSockets.js](https://github.com/uNetworking/uWebSockets.js) and replace the `#v20.43.0` in the commands below with your desired release tag.
+Installing uWebSockets.js for the first time can be a little unintuitive. Find your desired release tag in the [uWebSockets.js repository
+](https://github.com/uNetworking/uWebSockets.js) and replace the `#v20.43.0` in the commands below with your desired release tag.
 
 
 Install the package using npm:
