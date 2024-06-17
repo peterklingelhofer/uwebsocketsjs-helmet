@@ -1,6 +1,6 @@
 {
   "name": "uwebsocketsjs-helmet-example",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Example usage of uWebSockets.js-helmet",
   "main": "index.js",
   "scripts": {
