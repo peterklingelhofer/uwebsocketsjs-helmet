@@ -12,6 +12,7 @@ app.listen(9001, (token) => {
   if (token) {
     console.log("Listening to port 9001");
   } else {
-    console.log("Failed to listen to port 9001");
+    console.error("Failed to listen to port 9001");
+    process.exit(1); // Exit the process with an error code
   }
 });
