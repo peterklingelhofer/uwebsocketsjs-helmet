@@ -12,7 +12,7 @@
   "author": "Peter Klingelhofer",
   "license": "MIT",
   "dependencies": {
-    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.43.0",
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.44.0",
     "uwebsocketsjs-helmet": "../dist"
   },
   "devDependencies": {
