@@ -82,28 +82,28 @@ app.listen(9001, (token) => {
 
 ## Note on installing uWebSockets.js
 Installing uWebSockets.js for the first time can be a little unintuitive. Find your desired release tag in the [uWebSockets.js repository
-](https://github.com/uNetworking/uWebSockets.js) and replace the `#v20.43.0` in the commands below with your desired release tag.
+](https://github.com/uNetworking/uWebSockets.js) and replace the `#v20.44.0` in the commands below with your desired release tag.
 
 
 Install the package using npm:
 ```sh
-npm i uWebSockets.js@uNetworking/uWebSockets.js#v20.43.0
+npm i uWebSockets.js@uNetworking/uWebSockets.js#v20.44.0
 ```
 
 Install the package using pnpm:
 
 ```sh
-pnpm add uWebSockets.js@uNetworking/uWebSockets.js#v20.43.0
+pnpm add uWebSockets.js@uNetworking/uWebSockets.js#v20.44.0
 ```
 
 Install the package using yarn:
 
 ```sh
-yarn add uWebSockets.js@uNetworking/uWebSockets.js#v20.43.0
+yarn add uWebSockets.js@uNetworking/uWebSockets.js#v20.44.0
 ```
 
 Install the package using bun:
 
 ```sh
-bun add uWebSockets.js@uNetworking/uWebSockets.js#v20.43.0
+bun add uWebSockets.js@uNetworking/uWebSockets.js#v20.44.0
 ```

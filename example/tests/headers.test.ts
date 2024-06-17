@@ -1,12 +1,22 @@
 import * as http from 'http';
-import { exec, execSync } from 'child_process';
+import { exec, execSync, ChildProcess } from 'child_process';
 
-const startServer = (script: string) => {
-  return exec(`node dist/${script}.js`, { cwd: __dirname + '/..' });
+const startServer = (script: string): ChildProcess => {
+  const server = exec(`node dist/${script}.js`, { cwd: __dirname + '/..' });
+
+  server?.stdout?.on('data', (data: string) => {
+    console.log(`stdout: ${data}`);
+  });
+
+  server?.stderr?.on('data', (data: string) => {
+    console.error(`stderr: ${data}`);
+  });
+
+  return server;
 };
 
-const makeRequest = (path: string) => {
-  return new Promise<{ headers: http.IncomingHttpHeaders }>((resolve, reject) => {
+const makeRequest = (path: string): Promise<{ headers: http.IncomingHttpHeaders }> => {
+  return new Promise((resolve, reject) => {
     const req = http.request({ hostname: 'localhost', port: 9001, path }, res => {
       const headers = res.headers;
       res.on('data', () => {});
@@ -18,19 +28,27 @@ const makeRequest = (path: string) => {
 };
 
 describe('uWebSockets.js Helmet', () => {
-  let server: any;
+  let server: ChildProcess;
 
   beforeAll((done) => {
     execSync('pnpm run build', { cwd: __dirname + '/..' });
     server = startServer('index');
-    server.stdout.on('data', (data: any) => {
+    server?.stdout?.on('data', (data: string) => {
       if (data.includes('Listening to port 9001')) {
         done();
       }
     });
+    server?.stderr?.on('data', (data: string) => {
+      console.error(`Server failed to start: ${data}`);
+      done(new Error(`Server failed to start: ${data}`));
+    });
   });
 
-  afterAll(() => {
+  afterAll((done) => {
+    server.on('close', (code: number) => {
+      console.log(`child process exited with code ${code}`);
+      done();
+    });
     server.kill();
   });
 
@@ -46,12 +64,17 @@ describe('uWebSockets.js Helmet', () => {
     expect(response.headers['x-permitted-cross-domain-policies']).toBe('none');
     expect(response.headers['referrer-policy']).toBe('no-referrer');
     expect(response.headers['x-xss-protection']).toBe('0');
+    expect(response.headers['cross-origin-embedder-policy']).toBe('require-corp');
+    expect(response.headers['cross-origin-opener-policy']).toBe('same-origin');
+    expect(response.headers['cross-origin-resource-policy']).toBe('same-origin');
+    expect(response.headers['origin-agent-cluster']).toBe('?1');
+    expect(response.headers).not.toHaveProperty('x-powered-by');
   });
 
   test('custom headers are set', async () => {
     server.kill();
     server = startServer('customHeaders');
-    await new Promise(resolve => server.stdout.on('data', (data: any) => {
+    await new Promise(resolve => server?.stdout?.on('data', (data: string) => {
       if (data.includes('Listening to port 9001')) {
         resolve(true);
       }

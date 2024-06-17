@@ -14,15 +14,22 @@ const defaultHeaders: HelmetHeaderOptions = {
   "X-Content-Type-Options": "nosniff",
   "X-Permitted-Cross-Domain-Policies": "none",
   "Referrer-Policy": "no-referrer",
-  "X-XSS-Protection": "0"
+  "X-XSS-Protection": "0",
+  "Cross-Origin-Embedder-Policy": "require-corp",
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Resource-Policy": "same-origin",
+  "Origin-Agent-Cluster": "?1",
+  "X-Powered-By": "",
 };
-
 
 export function helmet(headers: HelmetHeaderOptions = {}) {
   const mergedHeaders = { ...defaultHeaders, ...headers };
 
   return function (res: HttpResponse, req: HttpRequest) {
     for (const [key, value] of Object.entries(mergedHeaders)) {
+      if (value === "") {
+        continue;
+      }
       res.writeHeader(key, value as string);
     }
   };
