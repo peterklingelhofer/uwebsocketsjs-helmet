@@ -1,6 +1,6 @@
 # uWebSockets.js Helmet
 
-A security middleware for [uWebSockets.js](https://github.com/uNetworking/uWebSockets.js) similar to [Helmet](https://github.com/helmetjs/helmet) for Express and [@fastify/helmet](https://github.com/fastify/fastify-helmet) for Fastify.
+A zero-dependency security middleware for [uWebSockets.js](https://github.com/uNetworking/uWebSockets.js) similar to [Helmet](https://github.com/helmetjs/helmet) for Express and [@fastify/helmet](https://github.com/fastify/fastify-helmet) for Fastify.
 
 ## Installation
 
