@@ -6,25 +6,25 @@ A zero-dependency security middleware for [uWebSockets.js](https://github.com/uN
 
 Install the package using npm:
 ```sh
-npm i peterklingelhofer/uwebsocketsjs-helmet#0.0.3
+npm i peterklingelhofer/uwebsocketsjs-helmet#0.0.4
 ```
 
 Install the package using pnpm:
 
 ```sh
-pnpm add peterklingelhofer/uwebsocketsjs-helmet#0.0.3
+pnpm add peterklingelhofer/uwebsocketsjs-helmet#0.0.4
 ```
 
 Install the package using yarn:
 
 ```sh
-yarn add peterklingelhofer/uwebsocketsjs-helmet#0.0.3
+yarn add peterklingelhofer/uwebsocketsjs-helmet#0.0.4
 ```
 
 Install the package using bun:
 
 ```sh
-bun add peterklingelhofer/uwebsocketsjs-helmet#0.0.3
+bun add peterklingelhofer/uwebsocketsjs-helmet#0.0.4
 ```
 
 ## Basic Usage
