@@ -1,6 +1,6 @@
 {
   "name": "uwebsocketsjs-helmet",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "A security middleware for uWebSockets.js similar to Helmet for Express and @fastify/helmet for Fastify",
   "main": "dist/index.js",
   "types": "dist/types.d.ts",
