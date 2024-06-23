@@ -5,7 +5,7 @@ const app = App();
 
 app.any("/*", (res, req) => {
   helmet()(res, req); // Apply default helmet headers
-  res.end("Hello from uWebSockets.js with helmet!");
+  res.end();
 });
 
 app.listen(9001, (token) => {
