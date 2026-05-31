@@ -123,17 +123,6 @@ import helmet from "uwebsocketsjs-helmet";
 - `helmet(headers?)` returns a handler that writes the merged headers; it resolves the active list once, so build it outside your route for the hot path.
 - A real uWebSockets.js `HttpResponse` satisfies `HelmetResponse` structurally, so no `uWebSockets.js` types are required at runtime.
 
-### Changes in 0.1.0
-
-To stay aligned with current browser behaviour and Helmet 8:
-
-- **Removed `Expect-CT`** — deprecated and removed from browsers (Helmet dropped it in v6).
-- **Removed `Cross-Origin-Embedder-Policy`** — not a Helmet default; it breaks many sites and should be opted into deliberately.
-- **`X-Frame-Options`** changed from `DENY` to `SAMEORIGIN` (Helmet's default).
-- **`Strict-Transport-Security`** changed to `max-age=31536000; includeSubDomains` (1 year, no `preload`). HSTS `preload` is a long-term commitment that should be opted into deliberately.
-- **`Content-Security-Policy`** expanded to Helmet's full default policy.
-
-If you relied on the previous values, pass them explicitly via the options argument.
 
 ## Development
 
