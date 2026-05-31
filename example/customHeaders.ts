@@ -1,25 +1,18 @@
 import { App } from "uWebSockets.js";
-import { helmet, HelmetHeaderOptions } from "uwebsocketsjs-helmet";
+import { helmet, type HelmetHeaderOptions } from "uwebsocketsjs-helmet";
 
 const customHeaders: HelmetHeaderOptions = {
   "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'",
-  "X-Frame-Options": "SAMEORIGIN",
+  "X-Frame-Options": "DENY",
 };
 
 const app = App();
 
 app.any("/*", (res, req) => {
-  // Apply custom helmet headers
   helmet(customHeaders)(res, req);
-
   res.end("Hello from uWebSockets.js with custom security headers!");
 });
 
 app.listen(9001, (token) => {
-  if (token) {
-    console.log("Listening to port 9001");
-  } else {
-    console.error("Failed to listen to port 9001");
-    process.exit(1); // Exit the process with an error code
-  }
+  console.log(token ? "Listening to port 9001" : "Failed to listen to port 9001");
 });
