@@ -1,5 +1,7 @@
 # uWebSockets.js Helmet
 
+[![CI](https://github.com/peterklingelhofer/uwebsocketsjs-helmet/actions/workflows/ci.yml/badge.svg)](https://github.com/peterklingelhofer/uwebsocketsjs-helmet/actions/workflows/ci.yml)
+
 A zero-dependency security headers middleware for [uWebSockets.js](https://github.com/uNetworking/uWebSockets.js), similar to [Helmet](https://github.com/helmetjs/helmet) for Express and [@fastify/helmet](https://github.com/fastify/fastify-helmet) for Fastify.
 
 It writes a curated set of secure-by-default HTTP response headers (matching Helmet 8's defaults) onto a uWebSockets.js response, and lets you override, extend, or suppress any of them.
@@ -16,10 +18,12 @@ yarn add uwebsocketsjs-helmet
 bun add uwebsocketsjs-helmet
 ```
 
+Requires Node.js 20 or later.
+
 `uWebSockets.js` is an optional peer dependency (used only for TypeScript types). Install it the way that project documents, replacing the tag with your desired [release](https://github.com/uNetworking/uWebSockets.js/releases):
 
 ```sh
-npm i uWebSockets.js@uNetworking/uWebSockets.js#v20.51.0
+npm i uWebSockets.js@uNetworking/uWebSockets.js#v20.68.0
 ```
 
 The package ships both ESM and CommonJS builds, so `import` and `require` both work.
@@ -100,6 +104,24 @@ These mirror Helmet 8's defaults:
 | `X-XSS-Protection` | `0` |
 
 The exported `defaultHeaders` object is available if you want to inspect or extend it programmatically.
+
+## API
+
+```ts
+import {
+  helmet,                   // (headers?) => (res, req?) => void factory
+  defaultHeaders,           // frozen Record<string, string> of the defaults above
+  type HelmetHeaderOptions, // Record<string, string | false> for overrides
+  type HelmetHandler,       // (res: HelmetResponse, req?: unknown) => void
+  type HelmetResponse,      // minimal { writeHeader(key, value) } shape a uWS response satisfies
+} from "uwebsocketsjs-helmet";
+
+// `helmet` is also the default export:
+import helmet from "uwebsocketsjs-helmet";
+```
+
+- `helmet(headers?)` returns a handler that writes the merged headers; it resolves the active list once, so build it outside your route for the hot path.
+- A real uWebSockets.js `HttpResponse` satisfies `HelmetResponse` structurally, so no `uWebSockets.js` types are required at runtime.
 
 ### Changes in 0.1.0
 
