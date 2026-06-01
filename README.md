@@ -6,6 +6,8 @@ A zero-dependency security headers middleware for [uWebSockets.js](https://githu
 
 It writes a curated set of secure-by-default HTTP response headers (matching Helmet 8's defaults) onto a uWebSockets.js response, and lets you override, extend, or suppress any of them.
 
+![The same uWebSockets.js server with curl -I, before and after applying helmet(): zero security headers become twelve](assets/headers-before-after.png)
+
 ## Installation
 
 ```sh
