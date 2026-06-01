@@ -10,17 +10,25 @@ It writes a curated set of secure-by-default HTTP response headers (matching Hel
 
 ## Installation
 
+This package is installed directly from GitHub. Install the latest from `main`:
+
 ```sh
-npm i uwebsocketsjs-helmet
+npm i github:peterklingelhofer/uwebsocketsjs-helmet
 # or
-pnpm add uwebsocketsjs-helmet
+pnpm add github:peterklingelhofer/uwebsocketsjs-helmet
 # or
-yarn add uwebsocketsjs-helmet
+yarn add github:peterklingelhofer/uwebsocketsjs-helmet
 # or
-bun add uwebsocketsjs-helmet
+bun add github:peterklingelhofer/uwebsocketsjs-helmet
 ```
 
-Requires Node.js 20 or later.
+To pin to a specific release, append a tag, branch, or commit:
+
+```sh
+npm i github:peterklingelhofer/uwebsocketsjs-helmet#v0.1.1
+```
+
+The `dist/` build is produced automatically on install (via the `prepare` script), so the GitHub syntax works for any tag or commit. Requires Node.js 20 or later.
 
 `uWebSockets.js` is an optional peer dependency (used only for TypeScript types). Install it the way that project documents, replacing the tag with your desired [release](https://github.com/uNetworking/uWebSockets.js/releases):
 
