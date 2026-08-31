@@ -84,6 +84,11 @@ beforeAll(async () => {
     res.end("nope");
   });
 
+  app.get("/case-override", (res) => {
+    helmet({ "x-frame-options": "DENY" })(res);
+    res.end("ok");
+  });
+
   app.ws("/ws", {
     upgrade: (res, req, context) => {
       res.upgrade(
@@ -145,6 +150,12 @@ describe("wire format", () => {
     expect(statusLine(await raw("/ws", WS_HANDSHAKE, true))).toBe(
       "HTTP/1.1 101 Switching Protocols",
     );
+  });
+
+  it("sends one header, not two, when an override differs only by case", async () => {
+    const response = await raw("/case-override");
+
+    expect(valuesOf(response, "X-Frame-Options")).toEqual(["DENY"]);
   });
 
   it("never emits a header twice", async () => {

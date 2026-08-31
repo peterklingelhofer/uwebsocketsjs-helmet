@@ -95,6 +95,59 @@ describe("helmet()", () => {
     expect(Object.isFrozen(defaultHeaders)).toBe(true);
   });
 
+  it("overrides a default whose casing differs, without duplicating it", () => {
+    const res = mockRes();
+    helmet({ "x-frame-options": "DENY" })(res, req);
+
+    // the canonical casing of the default is kept, and only one is written
+    expect(res.headers.get("X-Frame-Options")).toBe("DENY");
+    expect(res.headers.has("x-frame-options")).toBe(false);
+    expect(res.writeHeader).toHaveBeenCalledTimes(Object.keys(defaultHeaders).length);
+  });
+
+  it("suppresses a default whose casing differs", () => {
+    const res = mockRes();
+    helmet({ "strict-transport-security": false })(res, req);
+
+    expect(res.headers.has("Strict-Transport-Security")).toBe(false);
+    expect(res.headers.has("strict-transport-security")).toBe(false);
+  });
+
+  it("rejects a value containing CRLF, which would inject headers", () => {
+    expect(() => helmet({ "X-Test": "a\r\nX-Injected: pwned" })).toThrow(TypeError);
+  });
+
+  it.each([
+    ["a bare newline", { "X-Test": "a\nb" }],
+    ["a carriage return", { "X-Test": "a\rb" }],
+    ["a NUL byte", { "X-Test": "a\0b" }],
+    ["a non-ASCII byte", { "X-Test": "café" }],
+  ])("rejects %s in a header value", (_label, headers) => {
+    expect(() => helmet(headers)).toThrow(TypeError);
+  });
+
+  it.each([
+    ["a space", { "X Test": "1" }],
+    ["a colon", { "X:Test": "1" }],
+    ["a newline", { "X\nTest": "1" }],
+    ["an empty name", { "": "1" }],
+  ])("rejects %s in a header name", (_label, headers) => {
+    expect(() => helmet(headers)).toThrow(TypeError);
+  });
+
+  it("rejects two overrides that differ only by case", () => {
+    expect(() => helmet({ "X-Test": "1", "x-test": "2" })).toThrow(TypeError);
+  });
+
+  it("throws at construction time, not per request", () => {
+    expect(() => helmet({ "X-Test": "bad\r\n" })).toThrow(TypeError);
+  });
+
+  it("accepts a suppressed header whose value would otherwise be invalid", () => {
+    // `false` means "do not send", so there is nothing to validate
+    expect(() => helmet({ "X-Frame-Options": false })).not.toThrow();
+  });
+
   it("is also available as a default export", () => {
     expect(defaultExport).toBe(helmet);
   });

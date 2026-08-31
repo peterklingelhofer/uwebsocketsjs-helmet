@@ -111,6 +111,18 @@ app.any("/*", (res, req) => {
 app.listen(9001, () => {});
 ```
 
+Header names are matched case-insensitively, as HTTP requires, so `x-frame-options` overrides the `X-Frame-Options` default instead of being sent alongside it as a second, conflicting header. The default's canonical casing is what goes on the wire.
+
+### Validation
+
+`helmet()` validates its configuration once, when you build the handler, and throws a `TypeError` on:
+
+- a header name that is not a valid RFC 9110 token (contains a space, colon, newline, or is empty)
+- a value containing control characters or non-ASCII bytes, which would otherwise let a `\r\n` inject arbitrary extra headers (HTTP response splitting), since uWebSockets.js writes what you give it to the socket verbatim
+- two overrides that differ only by case, which is always a mistake
+
+Because this happens at construction time, a malformed policy fails at startup rather than silently shipping on every response.
+
 Build the handler once and reuse it for the hot path:
 
 ```ts

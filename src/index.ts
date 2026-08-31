@@ -52,9 +52,12 @@ export const defaultHeaders: Readonly<Record<string, string>> = Object.freeze({
  * Create a uWebSockets.js handler that writes a set of security headers
  * onto the response.
  *
- * @param headers - overrides merged on top of {@link defaultHeaders}. Set a
- * value to `false` (or `""`) to suppress one of the defaults.
+ * @param headers - overrides merged on top of {@link defaultHeaders}, matched
+ * case-insensitively. Set a value to `false` (or `""`) to suppress one of the
+ * defaults.
  * @returns a `(res, req) => void` function to call inside a route handler.
+ * @throws TypeError if a header name is not a valid token, a value contains
+ * control characters, or two overrides differ only by case.
  *
  * @remarks
  * uWebSockets.js writes responses into a linear buffer, so call order is wire
@@ -87,14 +90,73 @@ export const defaultHeaders: Readonly<Record<string, string>> = Object.freeze({
  * });
  * ```
  */
-export function helmet(headers: HelmetHeaderOptions = {}): HelmetHandler {
-  const merged: Record<string, string | false> = { ...defaultHeaders, ...headers };
+/** RFC 9110 token: the only characters legal in a header field name */
+const HEADER_NAME = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 
+/** Printable ASCII plus horizontal tab, which is all a field value may contain */
+const HEADER_VALUE = /^[\t\x20-\x7e]*$/;
+
+/**
+ * uWebSockets.js writes header names and values to the socket verbatim, with
+ * no validation of its own. A CR or LF in a value would therefore inject
+ * arbitrary extra headers into the response (HTTP response splitting), so
+ * reject anything malformed rather than emitting it.
+ */
+function assertValidHeader(name: string, value: string): void {
+  if (!HEADER_NAME.test(name)) {
+    throw new TypeError(`Invalid header name ${JSON.stringify(name)}: expected an RFC 9110 token`);
+  }
+  if (!HEADER_VALUE.test(value)) {
+    throw new TypeError(
+      `Invalid value for header ${name}: control characters and non-ASCII bytes are not allowed`,
+    );
+  }
+}
+
+/**
+ * Merge overrides onto the base headers and return the list to write.
+ *
+ * Header names are case-insensitive, so the merge is too: `x-frame-options`
+ * overrides the `X-Frame-Options` default rather than being sent alongside it
+ * as a second, conflicting header. The base's canonical casing is preserved.
+ */
+function resolveHeaders(
+  overrides: HelmetHeaderOptions,
+  base: Readonly<Record<string, string>>,
+): [string, string][] {
+  const byName = new Map<string, [name: string, value: string | false]>();
+
+  for (const [name, value] of Object.entries(base)) {
+    byName.set(name.toLowerCase(), [name, value]);
+  }
+
+  const seen = new Set<string>();
+  for (const [name, value] of Object.entries(overrides)) {
+    const lower = name.toLowerCase();
+    if (seen.has(lower)) {
+      throw new TypeError(
+        `Duplicate header ${JSON.stringify(name)}: header names are case-insensitive, so only one spelling may be given`,
+      );
+    }
+    seen.add(lower);
+    // keep the canonical casing when overriding one of the base headers
+    byName.set(lower, [byName.get(lower)?.[0] ?? name, value]);
+  }
+
+  const active: [string, string][] = [];
+  for (const [name, value] of byName.values()) {
+    if (value === false || value === "") continue;
+    assertValidHeader(name, value);
+    active.push([name, value]);
+  }
+  return active;
+}
+
+export function helmet(headers: HelmetHeaderOptions = {}): HelmetHandler {
   // Resolve the active headers once, at construction time, so the per-request
-  // hot path is a tight loop over a fixed list rather than re-filtering
-  const active = Object.entries(merged).filter(
-    (entry): entry is [string, string] => entry[1] !== false && entry[1] !== "",
-  );
+  // hot path is a tight loop over a fixed list rather than re-filtering, and
+  // so malformed configuration throws at startup rather than per request
+  const active = resolveHeaders(headers, defaultHeaders);
 
   return (res) => {
     for (const [key, value] of active) {
