@@ -246,6 +246,25 @@ describe("secureApp()", () => {
     expect(res.headers.size).toBe(Object.keys(defaultHeaders).length);
   });
 
+  it("writes the headers once even if a captured method is called after the flush", () => {
+    const app = mockApp();
+    secureApp(app);
+
+    const res = { ...mockRes(), end: vi.fn(), writeStatus: vi.fn() };
+    app.get("/*", (response) => {
+      const captured = response as typeof res;
+      // hold the wrapper, then commit through another path
+      const heldEnd = captured.end;
+      captured.writeStatus("404 Not Found");
+      heldEnd.call(captured);
+    });
+
+    app.routes.get("/*")?.(res, {});
+
+    expect(res.headers.size).toBe(Object.keys(defaultHeaders).length);
+    expect(res.writeHeader).toHaveBeenCalledTimes(Object.keys(defaultHeaders).length);
+  });
+
   it("restores the native methods once the headers are flushed", () => {
     const app = mockApp();
     secureApp(app);
