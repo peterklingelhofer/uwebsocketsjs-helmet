@@ -6,16 +6,17 @@
   "description": "Example usage of uwebsocketsjs-helmet",
   "scripts": {
     "start": "tsx index.ts",
-    "start:custom": "tsx customHeaders.ts"
+    "start:custom": "tsx customHeaders.ts",
+    "start:api": "tsx api.ts"
   },
   "author": "Peter Klingelhofer",
   "license": "MIT",
   "dependencies": {
-    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.51.0",
-    "uwebsocketsjs-helmet": "link:.."
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.68.0",
+    "uwebsocketsjs-helmet": "file:.."
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
+    "@types/node": "^24.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }

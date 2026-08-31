@@ -259,6 +259,23 @@ import helmet from "uwebsocketsjs-helmet";
 - A real uWebSockets.js `HttpResponse` satisfies `HelmetResponse` structurally, so no `uWebSockets.js` types are required at runtime.
 
 
+## Limitations
+
+Two things this package cannot do for you, both of them properties of uWebSockets.js rather than choices made here:
+
+**Unmatched routes bypass it.** When no route matches, uWebSockets.js answers `404 File Not Found` itself, without running any handler, so nothing can add headers to that response. Register a catch-all and those requests go through your own handler instead:
+
+```ts
+const app = secureApp(App());
+app.get("/health", handler);
+app.any("/*", (res) => {
+  res.writeStatus("404 Not Found");
+  res.end("not found");
+});
+```
+
+**The server banner cannot be removed.** uWebSockets.js appends `uWebSockets: 20` to every response from inside the library. Writing that header yourself adds a second one rather than replacing it, so the version stays visible. Strip it at a reverse proxy if that matters to you. This is the one Helmet behaviour with no equivalent here: Helmet's `X-Powered-By` removal has nothing to remove, but uWebSockets.js discloses its own version in its place.
+
 ## Development
 
 ```sh

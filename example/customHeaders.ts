@@ -1,15 +1,15 @@
 import { App } from "uWebSockets.js";
-import { helmet, type HelmetHeaderOptions } from "uwebsocketsjs-helmet";
+import { type HelmetHeaderOptions, secureApp } from "uwebsocketsjs-helmet";
 
 const customHeaders: HelmetHeaderOptions = {
   "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'",
   "X-Frame-Options": "DENY",
+  "Permissions-Policy": "geolocation=()",
 };
 
-const app = App();
+const app = secureApp(App(), customHeaders);
 
-app.any("/*", (res, req) => {
-  helmet(customHeaders)(res, req);
+app.any("/*", (res) => {
   res.end("Hello from uWebSockets.js with custom security headers!");
 });
 

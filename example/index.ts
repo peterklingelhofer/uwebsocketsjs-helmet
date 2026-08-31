@@ -1,11 +1,17 @@
 import { App } from "uWebSockets.js";
-import { helmet } from "uwebsocketsjs-helmet";
+import { secureApp } from "uwebsocketsjs-helmet";
 
-const app = App();
+// secureApp applies the default security headers to every HTTP route
+const app = secureApp(App());
 
-app.any("/*", (res, req) => {
-  helmet()(res, req); // apply default helmet headers
+app.any("/*", (res) => {
   res.end("ok");
+});
+
+// a status written anywhere in the handler is preserved
+app.get("/missing", (res) => {
+  res.writeStatus("404 Not Found");
+  res.end("nope");
 });
 
 app.listen(9001, (token) => {
