@@ -8,6 +8,8 @@
  */
 export interface HelmetResponse {
   writeHeader(key: string, value: string): unknown;
+  /** Present on a real `HttpResponse`; optional so partial mocks still satisfy this */
+  writeStatus?(status: string): unknown;
 }
 
 /**
@@ -18,8 +20,14 @@ export interface HelmetResponse {
  */
 export type HelmetHeaderOptions = Record<string, string | false>;
 
-/** A uWebSockets.js route handler that writes security headers onto the response. */
-export type HelmetHandler = (res: HelmetResponse, req?: unknown) => void;
+/**
+ * A uWebSockets.js route handler that writes security headers onto the response.
+ *
+ * The second argument is the request, which is ignored, or an HTTP status such
+ * as `"404 Not Found"`. Passing a status writes it before the headers, which is
+ * the order uWebSockets.js requires; see {@link helmet}.
+ */
+export type HelmetHandler = (res: HelmetResponse, statusOrReq?: unknown) => void;
 
 /**
  * The default security headers applied by {@link helmet}.
@@ -158,11 +166,160 @@ export function helmet(headers: HelmetHeaderOptions = {}): HelmetHandler {
   // so malformed configuration throws at startup rather than per request
   const active = resolveHeaders(headers, defaultHeaders);
 
-  return (res) => {
+  return (res, statusOrReq) => {
+    // a status has to reach the socket before any header, and the request
+    // object callers pass through from the route is never a string
+    if (typeof statusOrReq === "string") {
+      res.writeStatus?.(statusOrReq);
+    }
     for (const [key, value] of active) {
       res.writeHeader(key, value);
     }
   };
+}
+
+/**
+ * Route methods on a uWebSockets.js `TemplatedApp` that answer an HTTP request.
+ *
+ * `ws` is deliberately absent: writing a header into an upgrade response
+ * commits `200 OK` and breaks the `101 Switching Protocols` handshake.
+ */
+const ROUTE_METHODS = [
+  "get",
+  "post",
+  "put",
+  "del",
+  "patch",
+  "options",
+  "head",
+  "trace",
+  "connect",
+  "any",
+] as const;
+
+/** Response methods that commit the status line and so must flush our headers first. */
+const COMMITTING_METHODS = ["write", "end", "endWithoutBody", "tryEnd"] as const;
+
+type CommittingMethod = (typeof COMMITTING_METHODS)[number];
+
+/** Marks an app as already wrapped, so a second call cannot double up the headers. */
+const SECURED = Symbol.for("uwebsocketsjs-helmet.secured");
+
+/** The mutable view of a response that {@link deferHeaders} patches. */
+interface PatchableResponse extends HelmetResponse {
+  write?(...args: unknown[]): unknown;
+  end?(...args: unknown[]): unknown;
+  endWithoutBody?(...args: unknown[]): unknown;
+  tryEnd?(...args: unknown[]): unknown;
+}
+
+/**
+ * Arrange for `active` to be written at the last correct moment.
+ *
+ * uWebSockets.js commits the status line on the first `writeHeader`, so
+ * writing headers up front would discard any later `writeStatus` and break a
+ * WebSocket upgrade. Instead the headers are held until the handler does
+ * something that commits the response: writes its own status (ours follow it),
+ * writes its own header, or writes a body. `res.upgrade()` does none of those,
+ * so an upgrade never has headers written into it.
+ *
+ * Once flushed, the native methods are restored, so the rest of the response,
+ * including any streaming writes, runs with no wrapper in the way.
+ */
+function deferHeaders(res: PatchableResponse, active: readonly [string, string][]): void {
+  const writeHeader = res.writeHeader;
+  const writeStatus = res.writeStatus;
+  const committing = new Map<CommittingMethod, (...args: unknown[]) => unknown>();
+  for (const name of COMMITTING_METHODS) {
+    const original = res[name];
+    if (typeof original === "function") committing.set(name, original);
+  }
+
+  let flushed = false;
+  const flush = (): void => {
+    if (flushed) return;
+    flushed = true;
+
+    res.writeHeader = writeHeader;
+    if (writeStatus) res.writeStatus = writeStatus;
+    for (const [name, original] of committing) res[name] = original;
+
+    for (const [key, value] of active) {
+      writeHeader.call(res, key, value);
+    }
+  };
+
+  if (writeStatus) {
+    res.writeStatus = (status: string): unknown => {
+      const result = writeStatus.call(res, status);
+      flush();
+      return result;
+    };
+  }
+
+  res.writeHeader = (key: string, value: string): unknown => {
+    flush();
+    return writeHeader.call(res, key, value);
+  };
+
+  for (const [name, original] of committing) {
+    res[name] = (...args: unknown[]): unknown => {
+      flush();
+      return original.apply(res, args);
+    };
+  }
+}
+
+/**
+ * Apply security headers to every HTTP route on a uWebSockets.js app, the way
+ * `app.use(helmet())` does for Express.
+ *
+ * This is the recommended way to use this package. Unlike calling
+ * {@link helmet} by hand it cannot be applied in the wrong order: headers are
+ * written only once the handler commits the response, so a `res.writeStatus`
+ * anywhere in the handler is preserved, and WebSocket upgrades are untouched.
+ *
+ * The app is wrapped in place and returned. `app.ws(...)` is left alone.
+ *
+ * @param app - a uWebSockets.js `TemplatedApp` from `App()` or `SSLApp()`
+ * @param headers - overrides merged on top of {@link defaultHeaders}, exactly
+ * as for {@link helmet}
+ * @returns the same app, for convenience
+ * @throws TypeError if the app has already been wrapped, or if the headers are
+ * malformed
+ *
+ * @example
+ * ```ts
+ * const app = secureApp(App());
+ *
+ * app.get("/missing", (res) => {
+ *   res.writeStatus("404 Not Found"); // preserved
+ *   res.end("nope");
+ * });
+ * ```
+ */
+export function secureApp<T extends object>(app: T, headers: HelmetHeaderOptions = {}): T {
+  const target = app as unknown as Record<PropertyKey, unknown>;
+  if (target[SECURED] === true) {
+    throw new TypeError(
+      "secureApp() has already been applied to this app; applying it twice would send every header twice",
+    );
+  }
+
+  const active = resolveHeaders(headers, defaultHeaders);
+
+  for (const method of ROUTE_METHODS) {
+    const route = target[method];
+    if (typeof route !== "function") continue;
+    target[method] = (pattern: string, handler: (...args: never[]) => unknown): unknown =>
+      route.call(app, pattern, (res: PatchableResponse, req: unknown) => {
+        deferHeaders(res, active);
+        return handler(res as never, req as never);
+      });
+  }
+
+  target[SECURED] = true;
+  return app;
 }
 
 export default helmet;

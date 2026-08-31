@@ -56,6 +56,44 @@ app.listen(9001, (token) => {
 });
 ```
 
+## Automatic application
+
+`secureApp` wraps every HTTP route on an app, the way `app.use(helmet())` works for Express. This is the recommended way to use the package: it applies the headers for you, and unlike calling `helmet()` by hand it cannot be applied in the wrong order.
+
+```ts
+import { App } from "uWebSockets.js";
+import { secureApp } from "uwebsocketsjs-helmet";
+
+const app = secureApp(App());
+
+app.get("/", (res) => {
+  res.end("ok");
+});
+
+app.get("/missing", (res) => {
+  res.writeStatus("404 Not Found"); // preserved, wherever you write it
+  res.end("nope");
+});
+
+app.listen(9001, () => {});
+```
+
+It takes the same overrides as `helmet()`:
+
+```ts
+const app = secureApp(App(), { "X-Frame-Options": "DENY" });
+```
+
+Rather than writing headers up front, it holds them until your handler commits the response, by writing a status, writing a header of its own, or writing a body. That means:
+
+- a `res.writeStatus(...)` anywhere in your handler survives, so `404`s stay `404`s
+- `app.ws(...)` is left alone, so WebSocket upgrades still complete with `101 Switching Protocols`
+- your own headers are never duplicated, and `res.cork(...)`, chaining, and streamed `res.write` bodies all keep working
+
+The app is wrapped in place and returned, so `secureApp(App())` reads naturally. Wrapping the same app twice throws rather than silently sending every header twice.
+
+The cost is patching a handful of methods on each response; the native methods are put back as soon as the headers are written, so streaming stays on uWebSockets.js's own fast path. If you are counting nanoseconds, call `helmet()` by hand and follow the ordering rules below.
+
 ### Ordering rules
 
 uWebSockets.js formats responses into a linear buffer rather than a hash table, so the order of your calls is the order of the bytes on the wire. Two rules follow, and both are easy to get wrong:
@@ -70,9 +108,18 @@ app.get("/missing", (res) => {
 });
 ```
 
-If you only ever answer `200 OK`, applying `helmet()` at the top of the handler is fine. Otherwise, write the status first.
+If you only ever answer `200 OK`, applying `helmet()` at the top of the handler is fine. Otherwise, either use [`secureApp`](#automatic-application), or pass the status to the handler so it is written in the right order for you:
 
-> **2. Never apply `helmet()` in a WebSocket `upgrade` handler.** The same rule breaks the handshake: writing headers commits `200 OK`, so `res.upgrade()` can no longer send `101 Switching Protocols` and every client rejects the connection. Security headers are meaningless on a `101` response anyway, so leave `upgrade` handlers alone.
+```ts
+app.get("/missing", (res) => {
+  helmet()(res, "404 Not Found"); // status, then headers
+  res.end("nope");
+});
+```
+
+A string second argument is treated as the status; anything else, such as the `req` you get from the route, is ignored.
+
+> **2. Never apply `helmet()` in a WebSocket `upgrade` handler.** (`secureApp` never does.) The same rule breaks the handshake: writing headers commits `200 OK`, so `res.upgrade()` can no longer send `101 Switching Protocols` and every client rejects the connection. Security headers are meaningless on a `101` response anyway, so leave `upgrade` handlers alone.
 
 ```ts
 app.ws("/*", {
@@ -159,10 +206,11 @@ The exported `defaultHeaders` object is available if you want to inspect or exte
 
 ```ts
 import {
-  helmet,                   // (headers?) => (res, req?) => void factory
+  secureApp,                // (app, headers?) => app, wraps every HTTP route
+  helmet,                   // (headers?) => (res, statusOrReq?) => void factory
   defaultHeaders,           // frozen Record<string, string> of the defaults above
   type HelmetHeaderOptions, // Record<string, string | false> for overrides
-  type HelmetHandler,       // (res: HelmetResponse, req?: unknown) => void
+  type HelmetHandler,       // (res: HelmetResponse, statusOrReq?: unknown) => void
   type HelmetResponse,      // minimal { writeHeader(key, value) } shape a uWS response satisfies
 } from "uwebsocketsjs-helmet";
 
@@ -170,7 +218,9 @@ import {
 import helmet from "uwebsocketsjs-helmet";
 ```
 
-- `helmet(headers?)` returns a handler that writes the merged headers; it resolves the active list once, so build it outside your route for the hot path.
+- `secureApp(app, headers?)` wraps every HTTP route on the app in place and returns it. `app.ws(...)` is untouched. Throws if applied twice.
+- `helmet(headers?)` returns a handler that writes the merged headers; it resolves the active list once, so build it outside your route for the hot path. Pass a status string as the second argument to write it first.
+- Both validate their headers at construction time and throw a `TypeError` on malformed input.
 - A real uWebSockets.js `HttpResponse` satisfies `HelmetResponse` structurally, so no `uWebSockets.js` types are required at runtime.
 
 

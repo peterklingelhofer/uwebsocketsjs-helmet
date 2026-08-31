@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import defaultExport, { defaultHeaders, type HelmetResponse, helmet } from "../src/index.js";
+import defaultExport, {
+  defaultHeaders,
+  type HelmetResponse,
+  helmet,
+  secureApp,
+} from "../src/index.js";
 
 /**
  * Minimal stand-in for a uWebSockets.js HttpResponse that records every
@@ -150,5 +155,110 @@ describe("helmet()", () => {
 
   it("is also available as a default export", () => {
     expect(defaultExport).toBe(helmet);
+  });
+});
+
+describe("helmet() status argument", () => {
+  it("writes a status before the headers when given one", () => {
+    const calls: string[] = [];
+    const res = {
+      writeStatus: vi.fn((status: string) => calls.push(`status:${status}`)),
+      writeHeader: vi.fn((key: string) => calls.push(`header:${key}`)),
+    };
+
+    helmet()(res, "404 Not Found");
+
+    expect(calls[0]).toBe("status:404 Not Found");
+    expect(calls[1]).toBe("header:Content-Security-Policy");
+  });
+
+  it("ignores a request object, which is the long-standing signature", () => {
+    const res = { writeStatus: vi.fn(), writeHeader: vi.fn() };
+
+    helmet()(res, { getUrl: () => "/" });
+
+    expect(res.writeStatus).not.toHaveBeenCalled();
+    expect(res.writeHeader).toHaveBeenCalled();
+  });
+
+  it("still writes headers on a response with no writeStatus", () => {
+    const res = mockRes();
+
+    expect(() => helmet()(res, "404 Not Found")).not.toThrow();
+    expect(res.headers.get("X-Frame-Options")).toBe("SAMEORIGIN");
+  });
+});
+
+/** Minimal stand-in for a uWebSockets.js TemplatedApp */
+function mockApp() {
+  const routes = new Map<string, (res: unknown, req: unknown) => void>();
+  return {
+    routes,
+    get(pattern: string, handler: (res: unknown, req: unknown) => void) {
+      routes.set(pattern, handler);
+      return this;
+    },
+    ws: vi.fn(),
+  };
+}
+
+describe("secureApp()", () => {
+  it("returns the same app so it can wrap App() inline", () => {
+    const app = mockApp();
+
+    expect(secureApp(app)).toBe(app);
+  });
+
+  it("refuses to wrap the same app twice", () => {
+    const app = mockApp();
+    secureApp(app);
+
+    expect(() => secureApp(app)).toThrow(TypeError);
+  });
+
+  it("validates its headers up front", () => {
+    expect(() => secureApp(mockApp(), { "X-Test": "bad\r\n" })).toThrow(TypeError);
+  });
+
+  it("leaves app.ws untouched, since headers break the upgrade", () => {
+    const app = mockApp();
+    const original = app.ws;
+    secureApp(app);
+
+    expect(app.ws).toBe(original);
+  });
+
+  it("writes no headers until the handler commits the response", () => {
+    const app = mockApp();
+    secureApp(app);
+
+    const res = { ...mockRes(), end: vi.fn() };
+    let headersAtEntry = -1;
+    app.get("/*", (response) => {
+      headersAtEntry = (response as typeof res).headers.size;
+      (response as typeof res).end();
+    });
+
+    app.routes.get("/*")?.(res, {});
+
+    expect(headersAtEntry).toBe(0);
+    expect(res.headers.size).toBe(Object.keys(defaultHeaders).length);
+  });
+
+  it("restores the native methods once the headers are flushed", () => {
+    const app = mockApp();
+    secureApp(app);
+
+    const end = vi.fn();
+    const res = { ...mockRes(), end };
+    const nativeWriteHeader = res.writeHeader;
+
+    app.get("/*", (response) => {
+      (response as typeof res).end();
+    });
+    app.routes.get("/*")?.(res, {});
+
+    expect(res.end).toBe(end);
+    expect(res.writeHeader).toBe(nativeWriteHeader);
   });
 });

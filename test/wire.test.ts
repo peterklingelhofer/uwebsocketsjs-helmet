@@ -2,7 +2,7 @@ import type { TemplatedApp } from "uWebSockets.js";
 import uWS from "uWebSockets.js";
 import net from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { defaultHeaders, helmet } from "../src/index.js";
+import { defaultHeaders, helmet, secureApp } from "../src/index.js";
 
 /**
  * These tests drive a real uWebSockets.js server and read the raw bytes off
@@ -12,11 +12,17 @@ import { defaultHeaders, helmet } from "../src/index.js";
  */
 
 const PORT = 39_101;
+const SECURED_PORT = 39_102;
 
 /** Sends a hand-written request and resolves with the raw response text */
-function raw(path: string, extraHeaders = "", untilHeadersOnly = false): Promise<string> {
+function raw(
+  path: string,
+  extraHeaders = "",
+  untilHeadersOnly = false,
+  port = PORT,
+): Promise<string> {
   return new Promise((resolve, reject) => {
-    const socket = net.connect(PORT, "127.0.0.1", () => {
+    const socket = net.connect(port, "127.0.0.1", () => {
       socket.write(
         `GET ${path} HTTP/1.1\r\nHost: localhost\r\n${extraHeaders}Connection: close\r\n\r\n`,
       );
@@ -57,7 +63,9 @@ const WS_HANDSHAKE =
   "Upgrade: websocket\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n";
 
 let app: TemplatedApp;
+let securedApp: TemplatedApp;
 let token: unknown;
+let securedToken: unknown;
 
 beforeAll(async () => {
   app = uWS.App();
@@ -102,6 +110,55 @@ beforeAll(async () => {
     open: () => {},
   });
 
+  securedApp = secureApp(uWS.App());
+
+  // the status is written after the point at which a bare helmet() call would
+  // already have committed 200 OK
+  securedApp.get("/late-status", (res) => {
+    res.writeStatus("404 Not Found");
+    res.end("nope");
+  });
+
+  securedApp.get("/no-status", (res) => {
+    res.end("ok");
+  });
+
+  securedApp.get("/chained", (res) => {
+    res.writeStatus("201 Created").writeHeader("X-User", "u").end("made");
+  });
+
+  securedApp.get("/corked", (res) => {
+    res.cork(() => {
+      res.writeStatus("418 I'm a teapot");
+      res.end("tea");
+    });
+  });
+
+  securedApp.get("/own-header-first", (res) => {
+    res.writeHeader("Content-Type", "application/json");
+    res.end("{}");
+  });
+
+  securedApp.get("/streamed", (res) => {
+    res.writeStatus("206 Partial Content");
+    res.write("one");
+    res.write("two");
+    res.end("three");
+  });
+
+  securedApp.ws("/ws", {
+    upgrade: (res, req, context) => {
+      res.upgrade(
+        {},
+        req.getHeader("sec-websocket-key"),
+        req.getHeader("sec-websocket-protocol"),
+        req.getHeader("sec-websocket-extensions"),
+        context,
+      );
+    },
+    open: () => {},
+  });
+
   await new Promise<void>((resolve, reject) => {
     app.listen(PORT, (listenToken) => {
       token = listenToken;
@@ -109,10 +166,19 @@ beforeAll(async () => {
       else reject(new Error(`failed to listen on ${PORT}`));
     });
   });
+
+  await new Promise<void>((resolve, reject) => {
+    securedApp.listen(SECURED_PORT, (listenToken) => {
+      securedToken = listenToken;
+      if (listenToken) resolve();
+      else reject(new Error(`failed to listen on ${SECURED_PORT}`));
+    });
+  });
 });
 
 afterAll(() => {
   if (token) uWS.us_listen_socket_close(token as never);
+  if (securedToken) uWS.us_listen_socket_close(securedToken as never);
 });
 
 describe("wire format", () => {
@@ -166,5 +232,75 @@ describe("wire format", () => {
       .filter((name) => name !== "uwebsockets");
 
     expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+describe("secureApp on the wire", () => {
+  /** Requests the wrapped app rather than the hand-applied one */
+  const secured = (path: string, extraHeaders = "", untilHeadersOnly = false) =>
+    raw(path, extraHeaders, untilHeadersOnly, SECURED_PORT);
+
+  it("preserves a status written anywhere in the handler", async () => {
+    const response = await secured("/late-status");
+
+    expect(statusLine(response)).toBe("HTTP/1.1 404 Not Found");
+    expect(valuesOf(response, "X-Content-Type-Options")).toEqual(["nosniff"]);
+  });
+
+  it("still answers 200 OK when no status is written", async () => {
+    const response = await secured("/no-status");
+
+    expect(statusLine(response)).toBe("HTTP/1.1 200 OK");
+    expect(valuesOf(response, "X-Frame-Options")).toEqual(["SAMEORIGIN"]);
+  });
+
+  it("writes every default header exactly once", async () => {
+    const response = await secured("/no-status");
+
+    for (const [name, value] of Object.entries(defaultHeaders)) {
+      expect(valuesOf(response, name), `${name} should be sent exactly once`).toEqual([value]);
+    }
+  });
+
+  it("keeps writeStatus chainable", async () => {
+    const response = await secured("/chained");
+
+    expect(statusLine(response)).toBe("HTTP/1.1 201 Created");
+    expect(valuesOf(response, "X-User")).toEqual(["u"]);
+    expect(valuesOf(response, "X-Frame-Options")).toEqual(["SAMEORIGIN"]);
+  });
+
+  it("works inside res.cork", async () => {
+    const response = await secured("/corked");
+
+    expect(statusLine(response)).toBe("HTTP/1.1 418 I'm a teapot");
+    expect(valuesOf(response, "Referrer-Policy")).toEqual(["no-referrer"]);
+  });
+
+  it("does not duplicate a header the handler writes itself", async () => {
+    const response = await secured("/own-header-first");
+
+    expect(valuesOf(response, "Content-Type")).toEqual(["application/json"]);
+    expect(valuesOf(response, "X-Frame-Options")).toEqual(["SAMEORIGIN"]);
+  });
+
+  it("writes the headers once across a streamed body", async () => {
+    const response = await secured("/streamed");
+
+    expect(statusLine(response)).toBe("HTTP/1.1 206 Partial Content");
+    expect(valuesOf(response, "X-Frame-Options")).toEqual(["SAMEORIGIN"]);
+    // res.write puts uWebSockets.js into chunked mode, so decode the chunks
+    const body = response.split("\r\n\r\n").slice(1).join("\r\n\r\n");
+    const chunks = [...body.matchAll(/^[0-9a-f]+\r\n(.*)$/gm)].map((match) => match[1]);
+    expect(chunks.join("")).toBe("onetwothree");
+  });
+
+  it("leaves the WebSocket handshake intact", async () => {
+    const response = await secured("/ws", WS_HANDSHAKE, true);
+
+    expect(statusLine(response)).toBe("HTTP/1.1 101 Switching Protocols");
+    // security headers are meaningless on a 101 and would break the handshake
+    expect(valuesOf(response, "X-Frame-Options")).toEqual([]);
+    expect(valuesOf(response, "Content-Security-Policy")).toEqual([]);
   });
 });
