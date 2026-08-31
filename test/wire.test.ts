@@ -2,7 +2,7 @@ import type { TemplatedApp } from "uWebSockets.js";
 import uWS from "uWebSockets.js";
 import net from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { defaultHeaders, helmet, secureApp } from "../src/index.js";
+import { apiHeaders, defaultHeaders, helmet, secureApp } from "../src/index.js";
 
 /**
  * These tests drive a real uWebSockets.js server and read the raw bytes off
@@ -95,6 +95,11 @@ beforeAll(async () => {
   app.get("/case-override", (res) => {
     helmet({ "x-frame-options": "DENY" })(res);
     res.end("ok");
+  });
+
+  app.get("/api-preset", (res) => {
+    helmet(apiHeaders)(res);
+    res.end("{}");
   });
 
   app.ws("/ws", {
@@ -222,6 +227,23 @@ describe("wire format", () => {
     const response = await raw("/case-override");
 
     expect(valuesOf(response, "X-Frame-Options")).toEqual(["DENY"]);
+  });
+
+  it("sends exactly the API preset, replacing the defaults", async () => {
+    const response = await raw("/api-preset");
+
+    for (const [name, value] of Object.entries(apiHeaders)) {
+      if (value === false) {
+        expect(valuesOf(response, name), `${name} should not be sent`).toEqual([]);
+      } else {
+        expect(valuesOf(response, name)).toEqual([value]);
+      }
+    }
+    // nothing from the HTML-oriented defaults leaks through
+    expect(valuesOf(response, "Cross-Origin-Opener-Policy")).toEqual([]);
+    expect(valuesOf(response, "Content-Security-Policy")).toEqual([
+      "default-src 'none';frame-ancestors 'none'",
+    ]);
   });
 
   it("never emits a header twice", async () => {

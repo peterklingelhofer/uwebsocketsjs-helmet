@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import defaultExport, {
+  apiHeaders,
   defaultHeaders,
   type HelmetResponse,
   helmet,
@@ -260,5 +261,78 @@ describe("secureApp()", () => {
 
     expect(res.end).toBe(end);
     expect(res.writeHeader).toBe(nativeWriteHeader);
+  });
+});
+
+describe("apiHeaders", () => {
+  it("is frozen", () => {
+    expect(Object.isFrozen(apiHeaders)).toBe(true);
+  });
+
+  it("is accepted as an override set", () => {
+    const res = mockRes();
+    helmet(apiHeaders)(res, req);
+
+    expect(res.headers.get("Content-Security-Policy")).toBe(
+      "default-src 'none';frame-ancestors 'none'",
+    );
+    expect(res.headers.get("X-Frame-Options")).toBe("DENY");
+  });
+
+  it("keeps the protections that still apply to a non-HTML response", () => {
+    for (const name of [
+      "Content-Security-Policy",
+      "Cross-Origin-Resource-Policy",
+      "Referrer-Policy",
+      "Strict-Transport-Security",
+      "X-Content-Type-Options",
+      "X-Frame-Options",
+      "X-Permitted-Cross-Domain-Policies",
+    ]) {
+      expect(apiHeaders).toHaveProperty(name);
+    }
+  });
+
+  it("switches off the document-scoped defaults that do nothing for an API", () => {
+    for (const name of [
+      "Cross-Origin-Opener-Policy",
+      "Origin-Agent-Cluster",
+      "X-DNS-Prefetch-Control",
+      "X-Download-Options",
+      "X-XSS-Protection",
+    ]) {
+      expect(apiHeaders[name]).toBe(false);
+    }
+  });
+
+  it("replaces the defaults rather than adding to them", () => {
+    const res = mockRes();
+    helmet(apiHeaders)(res, req);
+
+    const sent = [...res.headers.keys()].sort();
+    expect(sent).toEqual(
+      Object.entries(apiHeaders)
+        .filter(([, value]) => value !== false)
+        .map(([name]) => name)
+        .sort(),
+    );
+    expect(sent).toHaveLength(7);
+  });
+
+  it("passes the same validation as any other header set", () => {
+    expect(() => helmet(apiHeaders)).not.toThrow();
+    expect(() => secureApp(mockApp(), apiHeaders)).not.toThrow();
+  });
+
+  it("is less than half the bytes of the Helmet defaults", () => {
+    const bytes = (headers: Readonly<Record<string, string | false>>) =>
+      Object.entries(headers).reduce(
+        (total, [name, value]) =>
+          value === false ? total : total + name.length + value.length + 4,
+        0,
+      );
+
+    expect(bytes(apiHeaders)).toBe(302);
+    expect(bytes(defaultHeaders)).toBe(663);
   });
 });

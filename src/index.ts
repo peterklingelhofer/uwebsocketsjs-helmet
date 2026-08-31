@@ -57,6 +57,50 @@ export const defaultHeaders: Readonly<Record<string, string>> = Object.freeze({
 });
 
 /**
+ * A leaner preset for services that answer with JSON or serve WebSockets
+ * rather than HTML.
+ *
+ * {@link defaultHeaders} mirrors Helmet, whose defaults are aimed at documents
+ * a browser will render. Most of that is inert on an API response: the
+ * document-scoped policies (`Cross-Origin-Opener-Policy`,
+ * `Origin-Agent-Cluster`, `X-DNS-Prefetch-Control`), a legacy IE header
+ * (`X-Download-Options`), and a large HTML-shaped CSP.
+ *
+ * This preset keeps what still protects a non-HTML response and replaces the
+ * CSP with `default-src 'none'`, which is both stricter and far shorter for
+ * content that should never load a subresource. `X-XSS-Protection` is dropped
+ * because the CSP already disables everything the legacy auditor guarded.
+ *
+ * It is a complete replacement rather than an addition: the defaults it drops
+ * are set to `false`, so passing it as the overrides yields exactly these
+ * seven headers, 302 bytes against the defaults' 663.
+ *
+ * Use it with {@link secureApp} or {@link helmet}:
+ *
+ * @example
+ * ```ts
+ * const app = secureApp(App(), apiHeaders);
+ * ```
+ */
+export const apiHeaders: Readonly<HelmetHeaderOptions> = Object.freeze({
+  "Content-Security-Policy": "default-src 'none';frame-ancestors 'none'",
+  "Cross-Origin-Resource-Policy": "same-origin",
+  "Referrer-Policy": "no-referrer",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "X-Permitted-Cross-Domain-Policies": "none",
+
+  // Document-scoped defaults, switched off rather than omitted so that this is
+  // a complete replacement for defaultHeaders rather than an addition to them
+  "Cross-Origin-Opener-Policy": false,
+  "Origin-Agent-Cluster": false,
+  "X-DNS-Prefetch-Control": false,
+  "X-Download-Options": false,
+  "X-XSS-Protection": false,
+});
+
+/**
  * Create a uWebSockets.js handler that writes a set of security headers
  * onto the response.
  *

@@ -202,6 +202,39 @@ These mirror Helmet 8's defaults:
 
 The exported `defaultHeaders` object is available if you want to inspect or extend it programmatically.
 
+## The API preset
+
+Helmet's defaults are aimed at HTML documents a browser will render. If your uWebSockets.js server answers with JSON or serves WebSockets, most of that is inert: `Cross-Origin-Opener-Policy`, `Origin-Agent-Cluster`, `X-DNS-Prefetch-Control` and `X-Download-Options` are document-scoped, and a 330-byte HTML-shaped CSP is doing nothing for a payload that will never load a subresource.
+
+`apiHeaders` is a leaner preset for that case. It is a complete replacement for the defaults, not an addition to them, so pass it as the overrides:
+
+```ts
+import { App } from "uWebSockets.js";
+import { apiHeaders, secureApp } from "uwebsocketsjs-helmet";
+
+const app = secureApp(App(), apiHeaders);
+```
+
+| Header | Value |
+| --- | --- |
+| `Content-Security-Policy` | `default-src 'none';frame-ancestors 'none'` |
+| `Cross-Origin-Resource-Policy` | `same-origin` |
+| `Referrer-Policy` | `no-referrer` |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` |
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `X-Permitted-Cross-Domain-Policies` | `none` |
+
+Seven headers at 302 bytes per response, against twelve at 663. The CSP is stricter than the default, not weaker: `default-src 'none'` denies everything rather than allowing same-origin subresources. `X-XSS-Protection` is dropped because that CSP already disables what the legacy auditor guarded.
+
+Tune it like any other override set:
+
+```ts
+const app = secureApp(App(), { ...apiHeaders, "Cross-Origin-Resource-Policy": "cross-origin" });
+```
+
+Reach for `defaultHeaders` (the default) whenever you serve HTML.
+
 ## API
 
 ```ts
@@ -209,6 +242,7 @@ import {
   secureApp,                // (app, headers?) => app, wraps every HTTP route
   helmet,                   // (headers?) => (res, statusOrReq?) => void factory
   defaultHeaders,           // frozen Record<string, string> of the defaults above
+  apiHeaders,               // frozen leaner preset for JSON and WebSocket services
   type HelmetHeaderOptions, // Record<string, string | false> for overrides
   type HelmetHandler,       // (res: HelmetResponse, statusOrReq?: unknown) => void
   type HelmetResponse,      // minimal { writeHeader(key, value) } shape a uWS response satisfies
@@ -218,6 +252,7 @@ import {
 import helmet from "uwebsocketsjs-helmet";
 ```
 
+- `apiHeaders` is a drop-in replacement for the defaults, aimed at non-HTML responses.
 - `secureApp(app, headers?)` wraps every HTTP route on the app in place and returns it. `app.ws(...)` is untouched. Throws if applied twice.
 - `helmet(headers?)` returns a handler that writes the merged headers; it resolves the active list once, so build it outside your route for the hot path. Pass a status string as the second argument to write it first.
 - Both validate their headers at construction time and throw a `TypeError` on malformed input.
