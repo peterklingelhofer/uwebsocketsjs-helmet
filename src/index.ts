@@ -57,15 +57,33 @@ export const defaultHeaders: Readonly<Record<string, string>> = Object.freeze({
  * @returns a `(res, req) => void` function to call inside a route handler.
  *
  * @remarks
- * uWebSockets.js requires `res.writeHeader` to be called *before* the
- * response body is sent (`res.end` / `res.write`). Apply this at the top of
- * your handler. When using `res.cork`, call it inside the corked callback.
+ * uWebSockets.js writes responses into a linear buffer, so call order is wire
+ * order. The first `writeHeader` commits the status line as `200 OK`, which
+ * means:
+ *
+ * - Call `res.writeStatus(...)` *before* this handler. A `writeStatus` after
+ *   the first header write is silently discarded.
+ * - Never call this in a WebSocket `upgrade` handler. Committing `200 OK`
+ *   stops `res.upgrade()` from sending `101 Switching Protocols` and breaks
+ *   the handshake.
+ *
+ * When responding outside the synchronous top of a route handler, do this
+ * inside a `res.cork(...)` callback.
  *
  * @example
  * ```ts
  * app.any("/*", (res, req) => {
  *   helmet()(res, req);
  *   res.end("ok");
+ * });
+ * ```
+ *
+ * @example Writing a non-200 status
+ * ```ts
+ * app.get("/missing", (res) => {
+ *   res.writeStatus("404 Not Found");
+ *   helmet()(res);
+ *   res.end("nope");
  * });
  * ```
  */

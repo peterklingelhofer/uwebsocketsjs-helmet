@@ -28,7 +28,7 @@ To pin to a specific release, append a tag, branch, or commit:
 npm i github:peterklingelhofer/uwebsocketsjs-helmet#v0.1.1
 ```
 
-The `dist/` build is produced automatically on install (via the `prepare` script), so the GitHub syntax works for any tag or commit. Requires Node.js 20 or later.
+The `dist/` build is produced automatically on install (via the `prepare` script), so the GitHub syntax works for any tag or commit. Requires Node.js 22 or later, matching the runtimes uWebSockets.js ships prebuilt binaries for.
 
 `uWebSockets.js` is an optional peer dependency (used only for TypeScript types). Install it the way that project documents, replacing the tag with your desired [release](https://github.com/uNetworking/uWebSockets.js/releases):
 
@@ -56,7 +56,35 @@ app.listen(9001, (token) => {
 });
 ```
 
-> uWebSockets.js requires headers to be written **before** the body. Call `helmet()` at the top of your handler, before `res.end`/`res.write`. When using `res.cork`, call it inside the corked callback.
+### Ordering rules
+
+uWebSockets.js formats responses into a linear buffer rather than a hash table, so the order of your calls is the order of the bytes on the wire. Two rules follow, and both are easy to get wrong:
+
+> **1. Write the status before the headers.** The first `res.writeHeader` commits the status line, calling `res.writeStatus("200 OK")` for you. A `res.writeStatus` *after* that point is silently discarded, so a handler that applies `helmet()` first and then sets `404` will answer `200 OK`.
+
+```ts
+app.get("/missing", (res) => {
+  res.writeStatus("404 Not Found"); // status first
+  helmet()(res);                    // then headers
+  res.end("nope");
+});
+```
+
+If you only ever answer `200 OK`, applying `helmet()` at the top of the handler is fine. Otherwise, write the status first.
+
+> **2. Never apply `helmet()` in a WebSocket `upgrade` handler.** The same rule breaks the handshake: writing headers commits `200 OK`, so `res.upgrade()` can no longer send `101 Switching Protocols` and every client rejects the connection. Security headers are meaningless on a `101` response anyway, so leave `upgrade` handlers alone.
+
+```ts
+app.ws("/*", {
+  upgrade: (res, req, context) => {
+    // do NOT call helmet() here
+    res.upgrade({}, req.getHeader("sec-websocket-key"), req.getHeader("sec-websocket-protocol"), req.getHeader("sec-websocket-extensions"), context);
+  },
+  open: () => {},
+});
+```
+
+When responding outside the synchronous top of a route handler, wrap your `writeStatus`/`writeHeader`/`end` calls in `res.cork(...)`, and apply `helmet()` inside the corked callback.
 
 ## Custom headers
 
