@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [20, 22, 24]
+        node-version: [22, 24]
     steps:
       - uses: actions/checkout@v4
 
@@ -35,3 +35,8 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Verify built package
+        run: |
+          node -e "const m=require('./dist/index.cjs'); if(typeof m.helmet!=='function') throw new Error('cjs export broken')"
+          node --input-type=module -e "import('./dist/index.js').then(m=>{if(typeof m.helmet!=='function')throw new Error('esm export broken')})"

@@ -6,8 +6,7 @@
   "description": "Example usage of uwebsocketsjs-helmet",
   "scripts": {
     "start": "tsx index.ts",
-    "start:custom": "tsx customHeaders.ts",
-    "test": "vitest run"
+    "start:custom": "tsx customHeaders.ts"
   },
   "author": "Peter Klingelhofer",
   "license": "MIT",
@@ -18,7 +17,6 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "typescript": "^5.7.2"
   }
 }
