@@ -25,7 +25,7 @@ bun add github:peterklingelhofer/uwebsocketsjs-helmet
 To pin to a specific release, append a tag, branch, or commit:
 
 ```sh
-npm i github:peterklingelhofer/uwebsocketsjs-helmet#v0.1.1
+npm i github:peterklingelhofer/uwebsocketsjs-helmet#v0.2.0
 ```
 
 The `dist/` build is produced automatically on install (via the `prepare` script), so the GitHub syntax works for any tag or commit. Requires Node.js 22 or later, matching the runtimes uWebSockets.js ships prebuilt binaries for.
