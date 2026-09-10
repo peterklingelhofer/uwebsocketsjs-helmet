@@ -71,6 +71,6 @@
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.68.0",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.11"
   }
 }
