@@ -68,7 +68,7 @@
     "@biomejs/biome": "^2.4.16",
     "@types/node": "^25.0.0",
     "@vitest/coverage-v8": "^4.1.7",
-    "tsup": "^8.5.1",
+    "tsup": "^9.0.0",
     "typescript": "^5.9.3",
     "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.68.0",
     "vitest": "^4.1.11"
